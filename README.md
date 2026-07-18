@@ -176,3 +176,7 @@ Everything that drives Premiere Pro itself (ExtendScript-backed commands,
 the CEP bridge panel) lives in the separate
 [premiere-cli](https://github.com/stefanwebb/premiere-cli) package, which
 this one depends on.
+
+## License
+
+[CC-BY-SA-4.0](LICENSE).

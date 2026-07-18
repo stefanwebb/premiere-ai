@@ -7,6 +7,7 @@ name = "premiere-ai"
 version = "0.1.0"
 description = "AI-assisted video-production workflows for Adobe Premiere Pro, built on premiere-cli"
 readme = "README.md"
+license = {text = "CC-BY-SA-4.0"}
 requires-python = ">=3.10"
 dependencies = [
     # Drives Premiere Pro itself (premiere-cli / premiere-log + the CEP
