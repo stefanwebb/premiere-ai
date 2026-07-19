@@ -109,29 +109,6 @@ Same as above for EGA palette recordings.
 
 ---
 
-### `create-empty-premiere-project <project_name> [--series <series_name>]`
-
-Creates a fresh, empty Premiere Pro project by copying the shared empty
-template and renaming its `.prproj` file to match the new project.
-
-```
-create-empty-premiere-project vlog0002
-create-empty-premiere-project "episode 2" --series vlog
-```
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--series / -s` | none | Nests the project under `<base-dir>/<series>/<project_name>` instead of directly under `<base-dir>` |
-| `--base-dir` | `/Volumes/Extreme Pro/video-production/Generative GameDev` | Override the destination base directory |
-
-**Template:** `/Volumes/Extreme Pro/video-production/Shared Assets/Empty Premiere Pro Template`
-
-Refuses to run if the destination directory already exists.
-
----
-
 ### `premiere-log` / `premiere-cli` (from the premiere-cli package)
 
 The Premiere-driving CLIs — `premiere-log` (send a message to the
@@ -139,7 +116,10 @@ Premiere Bridge panel's log view) and `premiere-cli` (execute
 ExtendScript-backed commands against the open project) — live in the
 separate [premiere-cli](https://github.com/stefanwebb/premiere-cli)
 package, installed automatically as a dependency of this one. See that
-repo's README and `docs/COMMANDS.md` for the full command reference.
+repo's README and `docs/COMMANDS.md` for the full command reference,
+including `premiere-cli init-project`, which creates a fresh empty
+project from a bundled template (formerly this package's
+`create-empty-premiere-project`).
 
 ---
 
@@ -151,7 +131,6 @@ src/premiere_ai/
     pause_cuts.py          pure pause-detection logic (timecodes, margins, VAD inversion, Claude parsing)
     remove_pauses.py       remove-pauses CLI orchestration
     scripts.py             thin Python wrappers for the shell scripts
-    create_empty_premiere_project.py  create-empty-premiere-project CLI
     sync_audio.py          sync-audio / audio-offset CLI
     import_raw_footage.py  import-raw-footage CLI
     zmbv_to_h265_vga.sh    VGA ZMBV → H.265 conversion
