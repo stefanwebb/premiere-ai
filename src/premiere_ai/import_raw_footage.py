@@ -1,6 +1,20 @@
 """Locate raw camera and microphone recordings on their mounted capture
 volumes, match a camera clip to a mic recording from the same take, and
 copy both into a Premiere Pro project directory.
+
+Where to look is entirely environment-driven — this package makes no
+assumption about anyone's specific camera model or mic hardware. Any
+variable left unset just means that source is skipped, so auto-detection
+degrades gracefully to whichever sources are configured; a caller that
+passes `--camera-file`/`--mic-file` explicitly doesn't need any of these
+set at all.
+
+- `PREMIERE_AI_CAMERA_GLOBS` — comma-separated glob pattern(s) for camera
+  clips, e.g. "/Volumes/MyCamera/DCIM/**/*.MP4"
+- `PREMIERE_AI_MIC_FLAT_ROOTS` — comma-separated directories to check
+  directly for `*.wav`/`*.WAV` files (non-recursive)
+- `PREMIERE_AI_MIC_RECURSIVE_ROOTS` — comma-separated directories to
+  search recursively for `*.wav`/`*.WAV` files
 """
 
 import glob
@@ -8,35 +22,33 @@ import os
 import shutil
 import subprocess
 
-CAMERA_CLIP_GLOB = "/Volumes/Sony EV-Z10/PRIVATE/M4ROOT/CLIP/*.MP4"
-
-WIRELESS_PRO_ROOTS = ["/Volumes/WirelessPRO", "/Volumes/WirelessPRO 1"]
-RODECASTER_ROOT = "/Volumes/Rodecaster 1"
-
 DEFAULT_TIME_TOLERANCE_SECONDS = 30 * 60
 DEFAULT_DURATION_TOLERANCE_SECONDS = 5.0
 DEFAULT_DURATION_TOLERANCE_PCT = 0.03
 
 
+def _split_env_list(name: str) -> list:
+    return [p.strip() for p in os.environ.get(name, "").split(",") if p.strip()]
+
+
 def find_camera_files() -> list:
-    """Return camera clip paths under the mounted Sony volume, newest first."""
-    files = glob.glob(CAMERA_CLIP_GLOB)
-    return sorted(files, key=os.path.getmtime, reverse=True)
+    """Return camera clip paths matching PREMIERE_AI_CAMERA_GLOBS, newest first."""
+    files = []
+    for pattern in _split_env_list("PREMIERE_AI_CAMERA_GLOBS"):
+        files.extend(glob.glob(pattern, recursive=True))
+    return sorted(set(files), key=os.path.getmtime, reverse=True)
 
 
 def find_mic_files() -> list:
-    """Return mic recording paths from any mounted mic source, newest first."""
+    """Return mic recording paths from configured mic sources, newest first."""
     files = []
-    for root in WIRELESS_PRO_ROOTS:
-        files.extend(glob.glob(os.path.join(root, "*.WAV")))
+    for root in _split_env_list("PREMIERE_AI_MIC_FLAT_ROOTS"):
         files.extend(glob.glob(os.path.join(root, "*.wav")))
-    if os.path.isdir(RODECASTER_ROOT):
-        for path in glob.glob(os.path.join(RODECASTER_ROOT, "RODECaster", "**", "*.wav"), recursive=True):
-            files.append(path)
-        for path in glob.glob(os.path.join(RODECASTER_ROOT, "RODECaster", "**", "*.WAV"), recursive=True):
-            files.append(path)
-    files = sorted(set(files), key=os.path.getmtime, reverse=True)
-    return files
+        files.extend(glob.glob(os.path.join(root, "*.WAV")))
+    for root in _split_env_list("PREMIERE_AI_MIC_RECURSIVE_ROOTS"):
+        files.extend(glob.glob(os.path.join(root, "**", "*.wav"), recursive=True))
+        files.extend(glob.glob(os.path.join(root, "**", "*.WAV"), recursive=True))
+    return sorted(set(files), key=os.path.getmtime, reverse=True)
 
 
 def get_duration_seconds(path: str) -> float:
@@ -70,9 +82,23 @@ def find_best_match(
     criterion.
     """
     if not camera_files:
-        raise RuntimeError(f"No camera recordings found under {CAMERA_CLIP_GLOB}")
+        configured = os.environ.get("PREMIERE_AI_CAMERA_GLOBS")
+        raise RuntimeError(
+            f"No camera recordings found (PREMIERE_AI_CAMERA_GLOBS={configured!r})"
+            if configured else
+            "No camera recordings found — PREMIERE_AI_CAMERA_GLOBS is not set, and "
+            "no --camera-file was given"
+        )
     if not mic_files:
-        raise RuntimeError("No microphone recordings found on any mounted mic volume")
+        flat = os.environ.get("PREMIERE_AI_MIC_FLAT_ROOTS")
+        recursive = os.environ.get("PREMIERE_AI_MIC_RECURSIVE_ROOTS")
+        raise RuntimeError(
+            f"No microphone recordings found (PREMIERE_AI_MIC_FLAT_ROOTS={flat!r}, "
+            f"PREMIERE_AI_MIC_RECURSIVE_ROOTS={recursive!r})"
+            if flat or recursive else
+            "No microphone recordings found — neither PREMIERE_AI_MIC_FLAT_ROOTS nor "
+            "PREMIERE_AI_MIC_RECURSIVE_ROOTS is set, and no --mic-file was given"
+        )
 
     cameras_newest_first = sorted(camera_files, key=os.path.getmtime, reverse=True)
     mics_newest_first = sorted(mic_files, key=os.path.getmtime, reverse=True)

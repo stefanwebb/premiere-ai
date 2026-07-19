@@ -109,6 +109,34 @@ Same as above for EGA palette recordings.
 
 ---
 
+### `import-raw-footage <project_dir>`
+
+Locates the latest matching raw camera recording and mic recording,
+matches them by capture time (falling back to media duration), and
+copies both into `<project_dir>/assets/video/` and
+`<project_dir>/assets/audio/`.
+
+```
+import-raw-footage /path/to/project
+import-raw-footage /path/to/project --camera-file cam.mp4 --mic-file mic.wav
+```
+
+This package makes no assumption about your camera or mic hardware —
+auto-detection is entirely driven by environment variables, each
+optional and comma-separated for multiple locations:
+
+| Variable | Purpose |
+|----------|---------|
+| `PREMIERE_AI_CAMERA_GLOBS` | Glob pattern(s) for camera clips, e.g. `/Volumes/MyCamera/DCIM/**/*.MP4` |
+| `PREMIERE_AI_MIC_FLAT_ROOTS` | Directories checked directly (non-recursive) for `*.wav`/`*.WAV` |
+| `PREMIERE_AI_MIC_RECURSIVE_ROOTS` | Directories searched recursively for `*.wav`/`*.WAV` |
+
+Any variable left unset just means that source is skipped; passing both
+`--camera-file` and `--mic-file` explicitly needs none of them set.
+Full flag reference: `import-raw-footage --help`.
+
+---
+
 ### `premiere-log` / `premiere-cli` (from the premiere-cli package)
 
 The Premiere-driving CLIs — `premiere-log` (send a message to the

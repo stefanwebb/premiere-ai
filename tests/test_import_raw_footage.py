@@ -13,6 +13,41 @@ def _touch(path: str, mtime: float, content: bytes = b"data") -> str:
     return path
 
 
+def test_find_camera_files_returns_empty_when_env_unset(monkeypatch):
+    monkeypatch.delenv("PREMIERE_AI_CAMERA_GLOBS", raising=False)
+
+    assert irf.find_camera_files() == []
+
+
+def test_find_camera_files_globs_configured_pattern(tmp_path, monkeypatch):
+    cam = _touch(str(tmp_path / "C0001.MP4"), time.time())
+    monkeypatch.setenv("PREMIERE_AI_CAMERA_GLOBS", str(tmp_path / "*.MP4"))
+
+    assert irf.find_camera_files() == [cam]
+
+
+def test_find_mic_files_returns_empty_when_env_unset(monkeypatch):
+    monkeypatch.delenv("PREMIERE_AI_MIC_FLAT_ROOTS", raising=False)
+    monkeypatch.delenv("PREMIERE_AI_MIC_RECURSIVE_ROOTS", raising=False)
+
+    assert irf.find_mic_files() == []
+
+
+def test_find_mic_files_checks_flat_and_recursive_roots(tmp_path, monkeypatch):
+    flat_root = tmp_path / "flat"
+    flat_root.mkdir()
+    flat_mic = _touch(str(flat_root / "mic.wav"), time.time())
+
+    recursive_root = tmp_path / "recursive"
+    (recursive_root / "nested").mkdir(parents=True)
+    recursive_mic = _touch(str(recursive_root / "nested" / "mic.wav"), time.time())
+
+    monkeypatch.setenv("PREMIERE_AI_MIC_FLAT_ROOTS", str(flat_root))
+    monkeypatch.setenv("PREMIERE_AI_MIC_RECURSIVE_ROOTS", str(recursive_root))
+
+    assert set(irf.find_mic_files()) == {flat_mic, recursive_mic}
+
+
 def test_find_best_match_prefers_close_mtimes(tmp_path):
     now = time.time()
     cam = _touch(str(tmp_path / "C0001.MP4"), now)
