@@ -230,6 +230,52 @@ history as a cautionary example: that combination is only physically valid
 when both pages are photographed together, under the same lighting, in
 the same frame).
 
+### `vectorscope <image> [<image> ...]`
+
+Renders a Premiere-Lumetri-style YUV vectorscope trace from one or more
+images: the same graticule Lumetri draws (bounding circle, the six
+75%/100% primary/secondary target boxes, the skin-tone line, centre
+crosshair), with the trace itself a log-scaled 2D histogram of the
+frame's Cb/Cr so dense regions read bright like a real scope's
+persistence.
+
+```
+vectorscope frame.png -o scope.png
+vectorscope before.png after.png -o compare.png --labels before after
+```
+
+Pass `--colorchecker-patches chromatic` or `--colorchecker-patches skin`
+to restrict the trace to just one category of patches on a Calibrite
+ColorChecker Passport Video 2's **video** page, instead of the whole
+frame — useful for judging hue accuracy against just the six chromatic
+(green/cyan/blue/magenta/red/yellow) or six skin-tone chips. This detects
+the chart with the same SAM3 pipeline `calibrate-lut` uses (chart
+location, then grid recovery to isolate the fixed chromatic/skin grid
+columns — see `patch_mask.py`).
+
+Add `--debug-mask-output path.png` alongside `--colorchecker-patches` to
+also save the image with everything outside the detected patches dimmed,
+so you can visually confirm the chart/column was located correctly
+before trusting the resulting trace. When rendering more than one image,
+each gets its own debug file (an index is inserted before the extension).
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output / -o` | *(required)* | Output image path |
+| `--labels` | filenames | Per-image titles |
+| `--bins` | `600` | Histogram resolution |
+| `--gain` | `3.0` | Trace brightness (higher shows sparser pixels) |
+| `--no-skin-line` | off | Hide the skin-tone line |
+| `--colorchecker-patches` | none | `chromatic` or `skin` — restrict the trace to that patch category |
+| `--debug-mask-output` | none | Save the masked image, for confirming detection landed correctly |
+
+**Prerequisites** — only needed with `--colorchecker-patches`, same as `calibrate-lut`:
+```
+hf download mlx-community/sam3-4bit
+```
+
 #### Diagnostics (`premiere_ai.colorchecker`)
 
 `calibrate-lut`'s supporting modules also include standalone diagnostic
@@ -246,11 +292,6 @@ via `python -m`:
 | `identify_video_patches` | Grid-recovery + colorimetric sanity checks on the video page |
 | `identify_classic_patches` | Grid-recovery + reference-matched identity checks on the classic page |
 | `apply_cube_lut` | Applies a `.cube` to an image, for visual before/after comparison |
-| `vectorscope_render` | Renders a Lumetri-style YUV vectorscope from an image |
-
-```
-python -m premiere_ai.colorchecker.vectorscope_render before.png after.png -o compare.png --labels before after
-```
 
 Several of these default their `--image` argument to a fixture image
 (`colorchecker.png`) that isn't bundled in this package — pass `--image`
@@ -293,6 +334,8 @@ src/premiere_ai/
     colorchecker/           ColorChecker chart -> Lumetri correction-LUT pipeline
         build_lut.py            calibrate-lut CLI (video-page production command)
         build_lut_classic.py    calibrate-lut-classic CLI (classic-page production command)
+        vectorscope_render.py   vectorscope CLI (renders a YUV vectorscope, optional patch masking)
+        patch_mask.py           detects the video page + builds chromatic/skin patch masks
         pages.py                per-page (classic/video) chart config
         patch_grid.py           grid recovery + colorimetric self-consistency checks
         classic_reference.py    published reference sRGB values for the classic page
@@ -302,7 +345,7 @@ src/premiere_ai/
         detect.py               VLM chart-location query (currently stubbed)
         segment.py, subsegment.py, segment_left_target.py,
         extract_targets.py, identify_video_patches.py,
-        identify_classic_patches.py, apply_cube_lut.py, vectorscope_render.py
+        identify_classic_patches.py, apply_cube_lut.py
                                  diagnostic tools, not installed as console scripts
 tests/                     pytest suite mirroring the modules above
 ```

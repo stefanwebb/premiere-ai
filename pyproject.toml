@@ -44,6 +44,7 @@ sync-audio = "premiere_ai.sync_audio:main"
 import-raw-footage = "premiere_ai.import_raw_footage:main"
 calibrate-lut = "premiere_ai.colorchecker.build_lut:main"
 calibrate-lut-classic = "premiere_ai.colorchecker.build_lut_classic:main"
+vectorscope = "premiere_ai.colorchecker.vectorscope_render:main"
 
 [project.optional-dependencies]
 dev = ["pytest"]
