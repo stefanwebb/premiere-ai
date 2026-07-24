@@ -137,6 +137,132 @@ Full flag reference: `import-raw-footage --help`.
 
 ---
 
+### `calibrate-lut <image>`
+
+Builds a 3D `.cube` correction LUT from a single photo of the **video
+page** of a Calibrite ColorChecker Passport Video 2 chart: detects the
+chart (SAM3), measures its patches, and fits
+
+- per-channel (R, G, B) tone curves for exposure/white-balance, from the
+  left-panel 3-step strip + grid columns 2 and 3 against IRE targets
+- a single global hue rotation aligning the six chromatic chips (col 0)
+  to their Rec.709 vectorscope target hues, folding in the skin-tone chips
+  (col 1) toward the classic "-I axis" skin-tone line
+- highlight/shadow anchors (col 3) folded into the same tone curves, at
+  IRE targets you can override
+
+```
+calibrate-lut chart_photo.png
+calibrate-lut chart_photo.png --output corrected.cube --lut-size 33
+calibrate-lut chart_photo.png --highlight-shadow-ire 100,97,94,6,3,0
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output / -o` | `<image>.cube` | Output `.cube` path |
+| `--lut-size` | `17` | LUT lattice size (per axis) |
+| `--highlight-shadow-ire` | `100,97,94,6,3,0` | 6 comma-separated IRE percentages for the highlight/shadow column, brightest row first — Calibrite doesn't publish exact values for this column, so override with real ones if you obtain them |
+
+**Prerequisites** — download the segmentation model before first use:
+```
+hf download mlx-community/sam3-4bit
+```
+
+**Caveats** (see the module docstring in `build_lut.py` for the full
+reasoning): per-channel WB/exposure uses real IRE targets, and the
+chromatic hue targets are exact (computed analytically from Rec.709) —
+but the skin-tone target and default highlight/shadow IRE values are
+reasoned estimates, not vendor-confirmed figures, so verify visually
+against Premiere's own skin-tone-line toggle before trusting them as
+exact. This only ever measures the chart's **video** page — see
+`calibrate-lut-classic` below for the traditional 24-patch page.
+
+The resulting `.cube` is exactly the input `premiere-cli`'s
+[`apply-lut`/`desktop-set-input-lut`](https://github.com/stefanwebb/premiere-cli)
+commands consume to apply the correction to a clip's Lumetri Color effect.
+
+---
+
+### `calibrate-lut-classic <image>`
+
+Builds a 3D `.cube` correction LUT from a photo of the **classic**
+(traditional 24-patch) page of an X-Rite/Calibrite ColorChecker: locates
+the chart (SAM3), segments its 24 squares, matches each to its published
+reference sRGB value (Hungarian assignment across the whole grid, so no
+single ambiguous patch can steal another's slot — cross-checked by finding
+which single rotate/flip orientation is consistent across the most
+matched patches, excluding any that disagree from the fit), and fits a
+color-correction matrix from measured colors to those references.
+
+```
+calibrate-lut-classic chart_photo.png
+calibrate-lut-classic chart_photo.png --output corrected.cube --lut-size 33
+calibrate-lut-classic chart_photo.png --matrix-method "Finlayson 2015" --matrix-degree 2
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output / -o` | `<image>.cube` | Output `.cube` path |
+| `--lut-size` | `17` | LUT lattice size (per axis) |
+| `--matrix-method` | `Cheung 2004` | `Cheung 2004` (plain 3x3 + offset affine fit) or `Finlayson 2015` (exposure-invariant root-polynomial expansion, more fitted terms) |
+| `--matrix-terms` | `4` | Cheung 2004 augmentation terms (4 = 3x3 + offset) |
+| `--matrix-degree` | `2` | Finlayson 2015 root-polynomial degree |
+
+**Prerequisites** — same as `calibrate-lut`:
+```
+hf download mlx-community/sam3-4bit
+```
+
+**Caveats**: reference values are BabelColor/Danny Pascale's published
+nominal sRGB measurements for the Classic chart, not the physical unit's
+own individually-calibrated values — good enough to verify grid
+orientation and fit a real hue/saturation/white-balance correction
+against, but this fits **only** a color matrix, no separate exposure/tone
+curve. Unlike `calibrate-lut`, this is a single-photo, single-page
+pipeline throughout — it does not attempt to combine anchors from a
+separate video-page shot (an earlier exploration combining both pages
+from two unrelated photos is preserved in `video-production`'s scratch
+history as a cautionary example: that combination is only physically valid
+when both pages are photographed together, under the same lighting, in
+the same frame).
+
+#### Diagnostics (`premiere_ai.colorchecker`)
+
+`calibrate-lut`'s supporting modules also include standalone diagnostic
+tools for troubleshooting chart detection/segmentation on new footage —
+not installed as console scripts (debug tools, not end-user commands), run
+via `python -m`:
+
+| Module | Purpose |
+|--------|---------|
+| `segment` | Confirms VLM chart-location + SAM3 segmentation agree |
+| `subsegment` | Visualizes the 24 individual patch segments |
+| `segment_left_target` | Visualizes the left target panel's segmentation |
+| `extract_targets` | Extracts just the chart's target regions from a photo |
+| `identify_video_patches` | Grid-recovery + colorimetric sanity checks on the video page |
+| `identify_classic_patches` | Grid-recovery + reference-matched identity checks on the classic page |
+| `apply_cube_lut` | Applies a `.cube` to an image, for visual before/after comparison |
+| `vectorscope_render` | Renders a Lumetri-style YUV vectorscope from an image |
+
+```
+python -m premiere_ai.colorchecker.vectorscope_render before.png after.png -o compare.png --labels before after
+```
+
+Several of these default their `--image` argument to a fixture image
+(`colorchecker.png`) that isn't bundled in this package — pass `--image`
+explicitly.
+
+The chart-location step (`detect.py`) is currently **stubbed** to a fixed
+simulated response rather than querying a live VLM server, so downstream
+work isn't blocked on one being available — see its module docstring
+before relying on it for a real detection.
+
+---
+
 ### `premiere-log` / `premiere-cli` (from the premiere-cli package)
 
 The Premiere-driving CLIs — `premiere-log` (send a message to the
@@ -164,6 +290,20 @@ src/premiere_ai/
     zmbv_to_h265_vga.sh    VGA ZMBV → H.265 conversion
     zmbv_to_h265_ega.sh    EGA ZMBV → H.265 conversion
     font_metrics.py        font measurement utilities
+    colorchecker/           ColorChecker chart -> Lumetri correction-LUT pipeline
+        build_lut.py            calibrate-lut CLI (video-page production command)
+        build_lut_classic.py    calibrate-lut-classic CLI (classic-page production command)
+        pages.py                per-page (classic/video) chart config
+        patch_grid.py           grid recovery + colorimetric self-consistency checks
+        classic_reference.py    published reference sRGB values for the classic page
+        vectorscope.py          Rec.709 vectorscope geometry / hue targets
+        tone_curve.py           per-channel tone-curve fitting
+        lut_io.py / image_io.py .cube read/write; color-managed image loading
+        detect.py               VLM chart-location query (currently stubbed)
+        segment.py, subsegment.py, segment_left_target.py,
+        extract_targets.py, identify_video_patches.py,
+        identify_classic_patches.py, apply_cube_lut.py, vectorscope_render.py
+                                 diagnostic tools, not installed as console scripts
 tests/                     pytest suite mirroring the modules above
 ```
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "premiere-ai"
-version = "0.2.0"
+version = "0.3.0"
 description = "AI-assisted video-production workflows for Adobe Premiere Pro, built on premiere-cli"
 readme = "README.md"
 license = {text = "CC-BY-SA-4.0"}
@@ -20,6 +20,16 @@ dependencies = [
     "anthropic",
     "python-dotenv",
     "fonttools",
+    # ColorChecker -> Lumetri-correction-LUT pipeline (calibrate-lut + the
+    # premiere_ai.colorchecker diagnostic modules).
+    "numpy",
+    "pillow",
+    "scipy",
+    "scikit-learn",
+    "colour-science",
+    "matplotlib",
+    "mlx-vlm",
+    "pydantic",
 ]
 
 [project.urls]
@@ -32,6 +42,8 @@ zmbv-to-h265-vga = "premiere_ai.scripts:zmbv_to_h265_vga"
 zmbv-to-h265-ega = "premiere_ai.scripts:zmbv_to_h265_ega"
 sync-audio = "premiere_ai.sync_audio:main"
 import-raw-footage = "premiere_ai.import_raw_footage:main"
+calibrate-lut = "premiere_ai.colorchecker.build_lut:main"
+calibrate-lut-classic = "premiere_ai.colorchecker.build_lut_classic:main"
 
 [project.optional-dependencies]
 dev = ["pytest"]
